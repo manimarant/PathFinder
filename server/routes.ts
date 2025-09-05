@@ -231,7 +231,7 @@ function generatePersonalizedFallback(formData: any): any {
   let salaryRange = "$35,000 - $55,000";
   let estimatedCost = "$18,000";
   let completionTime = "24 months";
-  let alternativePathways = [];
+  let alternativePathways: Array<{ title: string; description: string; matchScore: number }> = [];
 
   // Customize based on education level
   if (educationLevel === "high_school") {
