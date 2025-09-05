@@ -3,9 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { questionnaireSchema, recommendationSchema } from "@shared/schema";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_KEY || "sk-demo-key" 
+});
+
+const gemini = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY || "" 
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -61,8 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function generateRecommendation(formData: any): Promise<any> {
-  try {
-    const prompt = `You are an expert educational advisor. Based on the following student profile, recommend the most suitable educational program and provide detailed insights.
+  const prompt = `You are an expert educational advisor. Based on the following student profile, recommend the most suitable educational program and provide detailed insights.
 
 Student Profile:
 - Education Level: ${formData.educationLevel}
@@ -113,31 +117,107 @@ Please provide a comprehensive recommendation in the following JSON format:
 
 Ensure all numbers are realistic and the recommendations are relevant to the student's background and goals.`;
 
-    // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-    });
+  // Try Google Gemini first (free tier: 60 requests/minute)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      console.log("Attempting Gemini API call...");
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              recommendedProgram: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  matchScore: { type: "number" }
+                }
+              },
+              programInsights: {
+                type: "object",
+                properties: {
+                  enrolled: { type: "number" },
+                  graduated: { type: "number" },
+                  completionTime: { type: "string" },
+                  successRate: { type: "number" }
+                }
+              },
+              careerProjections: {
+                type: "object",
+                properties: {
+                  jobTitles: { type: "array", items: { type: "string" } },
+                  salaryRange: { type: "string" },
+                  industryGrowth: { type: "string" },
+                  alumniExample: { type: "string" }
+                }
+              },
+              financialInfo: {
+                type: "object",
+                properties: {
+                  estimatedCost: { type: "string" },
+                  scholarships: { type: "array", items: { type: "string" } },
+                  corporateDiscounts: { type: "boolean" }
+                }
+              },
+              alternativePathways: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    matchScore: { type: "number" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        contents: prompt,
+      });
 
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error("No response from OpenAI");
+      const content = response.text;
+      if (content) {
+        const recommendation = JSON.parse(content);
+        recommendationSchema.parse(recommendation);
+        console.log("✅ Gemini API successful");
+        return recommendation;
+      }
+    } catch (geminiError) {
+      console.error("Gemini API error:", geminiError);
     }
-
-    const recommendation = JSON.parse(content);
-    
-    // Validate the recommendation structure
-    recommendationSchema.parse(recommendation);
-    
-    return recommendation;
-  } catch (error) {
-    console.error("OpenAI recommendation error:", error);
-    
-    // Return a personalized fallback recommendation based on user input
-    return generatePersonalizedFallback(formData);
   }
+
+  // Fallback to OpenAI if Gemini fails
+  if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes("demo")) {
+    try {
+      console.log("Attempting OpenAI API call...");
+      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = response.choices[0].message.content;
+      if (content) {
+        const recommendation = JSON.parse(content);
+        recommendationSchema.parse(recommendation);
+        console.log("✅ OpenAI API successful");
+        return recommendation;
+      }
+    } catch (openaiError) {
+      console.error("OpenAI API error:", openaiError);
+    }
+  }
+
+  // Final fallback to personalized recommendations
+  console.log("🔄 Using personalized fallback recommendations");
+  return generatePersonalizedFallback(formData);
 }
 
 function generatePersonalizedFallback(formData: any): any {
