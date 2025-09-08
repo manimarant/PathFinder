@@ -77,7 +77,9 @@ Student Profile:
 - Career Goals: ${formData.careerGoals}
 - Learning Preference: ${formData.learningPreference}
 
-Please provide a comprehensive recommendation in the following JSON format:
+IMPORTANT: You MUST return a complete JSON object with ALL required fields. Do not omit any fields.
+
+Please provide a comprehensive recommendation in the following EXACT JSON format (all fields are required):
 {
   "recommendedProgram": {
     "title": "Program name",
@@ -115,7 +117,7 @@ Please provide a comprehensive recommendation in the following JSON format:
   ]
 }
 
-Ensure all numbers are realistic and the recommendations are relevant to the student's background and goals.`;
+Return ONLY the JSON object, no additional text or formatting. Ensure all numbers are realistic and the recommendations are relevant to the student's background and goals.`;
 
   // Try Google Gemini first (free tier: 60 requests/minute)
   if (process.env.GEMINI_API_KEY) {
@@ -134,7 +136,8 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
                   title: { type: "string" },
                   description: { type: "string" },
                   matchScore: { type: "number" }
-                }
+                },
+                required: ["title", "description", "matchScore"]
               },
               programInsights: {
                 type: "object",
@@ -143,7 +146,8 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
                   graduated: { type: "number" },
                   completionTime: { type: "string" },
                   successRate: { type: "number" }
-                }
+                },
+                required: ["enrolled", "graduated", "completionTime", "successRate"]
               },
               careerProjections: {
                 type: "object",
@@ -152,7 +156,8 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
                   salaryRange: { type: "string" },
                   industryGrowth: { type: "string" },
                   alumniExample: { type: "string" }
-                }
+                },
+                required: ["jobTitles", "salaryRange", "industryGrowth", "alumniExample"]
               },
               financialInfo: {
                 type: "object",
@@ -160,7 +165,8 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
                   estimatedCost: { type: "string" },
                   scholarships: { type: "array", items: { type: "string" } },
                   corporateDiscounts: { type: "boolean" }
-                }
+                },
+                required: ["estimatedCost", "scholarships", "corporateDiscounts"]
               },
               alternativePathways: {
                 type: "array",
@@ -170,10 +176,12 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
                     title: { type: "string" },
                     description: { type: "string" },
                     matchScore: { type: "number" }
-                  }
+                  },
+                  required: ["title", "description", "matchScore"]
                 }
               }
-            }
+            },
+            required: ["recommendedProgram", "programInsights", "careerProjections", "financialInfo", "alternativePathways"]
           }
         },
         contents: prompt,
@@ -182,9 +190,17 @@ Ensure all numbers are realistic and the recommendations are relevant to the stu
       const content = response.text;
       if (content) {
         const recommendation = JSON.parse(content);
-        recommendationSchema.parse(recommendation);
-        console.log("✅ Gemini API successful");
-        return recommendation;
+        console.log("Gemini API response:", JSON.stringify(recommendation, null, 2));
+        
+        try {
+          recommendationSchema.parse(recommendation);
+          console.log("✅ Gemini API successful");
+          return recommendation;
+        } catch (validationError) {
+          console.error("Gemini API response validation failed:", validationError);
+          console.log("Falling back to personalized recommendations due to schema validation error");
+          throw validationError; // This will trigger the fallback to personalized recommendations
+        }
       }
     } catch (geminiError) {
       console.error("Gemini API error:", geminiError);
