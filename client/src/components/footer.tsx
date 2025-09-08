@@ -2,7 +2,7 @@ interface FooterProps {
   universityName?: string;
 }
 
-export function Footer({ universityName = "Capella University" }: FooterProps) {
+export function Footer({ universityName = "Innovate University" }: FooterProps) {
   return (
     <footer className="border-t border-border bg-muted/20 mt-16">
       <div className="max-w-6xl mx-auto px-6 py-12">
@@ -13,8 +13,8 @@ export function Footer({ universityName = "Capella University" }: FooterProps) {
               Empowering students to achieve their educational and career goals through innovative programs.
             </p>
             <div className="text-sm text-muted-foreground">
-              <div data-testid="footer-phone">1-800-CAPELLA</div>
-              <div data-testid="footer-email">info@capella.edu</div>
+              <div data-testid="footer-phone">1-800-INNOVATE</div>
+              <div data-testid="footer-email">info@innovate.edu</div>
             </div>
           </div>
           <div>

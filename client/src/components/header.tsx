@@ -4,7 +4,7 @@ interface HeaderProps {
   universityName?: string;
 }
 
-export function Header({ universityName = "Capella University" }: HeaderProps) {
+export function Header({ universityName = "Innovate University" }: HeaderProps) {
   return (
     <header className="border-b border-border bg-background">
       <div className="max-w-6xl mx-auto px-6 py-4">
